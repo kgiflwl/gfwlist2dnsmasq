@@ -1,0 +1,40 @@
+name: Generate dnsmasq configuration
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gfwlist2dnsmasq script
+        run: |
+          chmod +x gfwlist2dnsmasq.sh
+          ./gfwlist2dnsmasq.sh -o dnsmasq_gfwlist.conf -p 5353
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet dnsmasq_gfwlist.conf; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add dnsmasq_gfwlist.conf
+          git commit -m "chore: update dnsmasq gfw configuration"
+          git push
